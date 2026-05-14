@@ -1,0 +1,4 @@
+.claude/
+*.o
+Lab1-linux/datalink
+settings.local.json
