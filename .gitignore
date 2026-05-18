@@ -3,3 +3,7 @@
 Lab1-linux/datalink
 *.log
 settings.local.json
+Windows/
+Lab1-Windows-VS2013/
+Lab1-Windows-VS2017/
+Lab1-Windows-VS2019/
