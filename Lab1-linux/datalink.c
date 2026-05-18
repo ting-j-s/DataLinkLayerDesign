@@ -33,22 +33,29 @@ static seq_nr frame_expected = 0;     /* next expected seq number */
 static int phl_ready = 0;
 
 /*
- * Check if b lies in the circular interval [a, c).
- * Used for sequence number comparisons in sliding window.
- */
-static bool between(seq_nr a, seq_nr b, seq_nr c)
-{
-	return ((a <= b) && (b < c)) ||
-	       ((c < a) && (a <= b)) ||
-	       ((b < c) && (c < a));
-}
-
-/*
  * Count outstanding frames in sender window: frames in [ack_expected, next_frame_to_send).
  */
 static int outstanding_frames(void)
 {
 	return (next_frame_to_send - ack_expected + NBUF) % NBUF;
+}
+
+/*
+ * Check if an ACK is valid for the current sender window.
+ * ACK=k means all frames before k have been received (cumulative ACK).
+ * Returns true iff ack is in (ack_expected, ack_expected + outstanding].
+ */
+static bool ack_acceptable(seq_nr ack)
+{
+	int outstanding = outstanding_frames();
+	int distance;
+
+	if (outstanding == 0)
+		return false;
+
+	distance = (ack - ack_expected + NBUF) % NBUF;
+
+	return distance > 0 && distance <= outstanding;
 }
 
 static void put_frame(unsigned char *frame, int len)
@@ -126,17 +133,10 @@ int main(int argc, char **argv)
 			/* ACK frame: cumulative ACK, advance ack_expected */
 			if (f.kind == FRAME_ACK) {
 				dbg_frame("Recv ACK  %d\n", f.ack);
-				/* Process only valid ACKs within outstanding window */
-				if (f.ack != ack_expected &&
-				    between(ack_expected, f.ack,
-				            next_frame_to_send != ack_expected ?
-				            next_frame_to_send :
-				            (seq_nr)(ack_expected + 1) % NBUF)) {
+				if (ack_acceptable(f.ack)) {
 					stop_timer(0);
 					while (ack_expected != f.ack) {
 						ack_expected = (ack_expected + 1) % NBUF;
-						if (ack_expected == next_frame_to_send)
-							break;
 					}
 					if (ack_expected != next_frame_to_send)
 						start_timer(0, DATA_TIMER);
@@ -149,16 +149,10 @@ int main(int argc, char **argv)
 					  f.ack, *(short *)f.data);
 
 				/* Piggybacked ACK: advance sender window */
-				if (f.ack != ack_expected &&
-				    between(ack_expected, f.ack,
-				            next_frame_to_send != ack_expected ?
-				            next_frame_to_send :
-				            (seq_nr)(ack_expected + 1) % NBUF)) {
+				if (ack_acceptable(f.ack)) {
 					stop_timer(0);
 					while (ack_expected != f.ack) {
 						ack_expected = (ack_expected + 1) % NBUF;
-						if (ack_expected == next_frame_to_send)
-							break;
 					}
 					if (ack_expected != next_frame_to_send)
 						start_timer(0, DATA_TIMER);
