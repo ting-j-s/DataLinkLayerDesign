@@ -10,13 +10,15 @@
 ## 2. 帧格式
 
 ```
-DATA Frame:  KIND(1) | SEQ(1) | ACK(1) | DATA(256) | CRC(4)
+DATA Frame:  KIND(1) | ACK(1) | SEQ(1) | DATA(256) | CRC(4)
 ACK  Frame:  KIND(1) | ACK(1) | CRC(4)
+
+调试输出中 `Send DATA %d %d` 打印的是 `seq` 和 `ack`，便于观察协议行为；但实际 C 结构体 `struct FRAME` 字段顺序为 `kind, ack, seq, data, padding`，其中 `padding` 存放 CRC32 校验值。
 ```
 
 - **KIND**: 1=DATA, 2=ACK, 3=NAK
-- **SEQ**: 发送方当前帧序号（8-bit, 0~255）
 - **ACK**: 累计确认，值为接收方下一个期望帧号（即 k 表示 k 之前全部正确收到）
+- **SEQ**: 发送方当前帧序号（8-bit, 0~255）
 - **CRC**: CRC32 校验，覆盖帧头和数据
 
 ## 3. 核心机制
